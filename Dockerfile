@@ -17,6 +17,7 @@ RUN apt-get update \
 
 # Install Python dependencies
 COPY requirements.txt /app/
+RUN python -m ensurepip --upgrade
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project
