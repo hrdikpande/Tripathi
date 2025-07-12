@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_celery_beat',
     'drf_spectacular',
+    'channels',
+    'django_filters',
     
     # Local apps
     'aggregator',
@@ -66,6 +68,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'news_scraper.wsgi.application'
+ASGI_APPLICATION = 'news_scraper.asgi.application'
 
 # Database
 DATABASES = {
@@ -181,6 +184,16 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Channels Configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 # Logging Configuration
 LOGGING = {

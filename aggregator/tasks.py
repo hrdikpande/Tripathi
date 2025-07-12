@@ -5,13 +5,17 @@ Celery tasks for the aggregator app.
 import logging
 from typing import List, Dict
 from celery import shared_task
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from .models import Article
 from .scrapers import get_scraper_node, get_scraper_function, SCRAPERS
+from .serializers import ArticleListSerializer
 
 logger = logging.getLogger(__name__)
+channel_layer = get_channel_layer()
 
 
 @shared_task(bind=True, max_retries=3)
@@ -64,6 +68,8 @@ def scrape_and_store_articles(self, sources: List[str] = None):
     # Invalidate cache after new articles are added
     if total_new_articles > 0:
         invalidate_article_cache()
+        # Send real-time update via WebSocket
+        send_realtime_update.delay()
     
     logger.info(f"Scraping task completed. Total: {total_articles}, New: {total_new_articles}")
     
@@ -123,6 +129,31 @@ def store_articles(articles: List[Dict]) -> int:
                 continue
     
     return new_articles_count
+
+
+@shared_task
+def send_realtime_update():
+    """Send real-time update to WebSocket clients."""
+    try:
+        # Get latest articles
+        latest_articles = Article.objects.all().order_by('-published_at')[:10]
+        serializer = ArticleListSerializer(latest_articles, many=True)
+        
+        # Send to WebSocket group
+        async_to_sync(channel_layer.group_send)(
+            'news_updates',
+            {
+                'type': 'news_update',
+                'data': {
+                    'articles': serializer.data,
+                    'timestamp': timezone.now().isoformat()
+                }
+            }
+        )
+        logger.info("Sent real-time update to WebSocket clients")
+        
+    except Exception as e:
+        logger.error(f"Error sending real-time update: {e}")
 
 
 @shared_task
